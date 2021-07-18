@@ -32,6 +32,7 @@ Handshake protocol
 void establish_handshake() {
     while(!connected) {
         Serial.print('R');
+        delay(500);
 
         if(Serial.available() > 0) {
             byte byte_in = Serial.read();
@@ -53,22 +54,32 @@ void setup() {
 
 void loop() {
     static unsigned int led_ind = 0;
-    static char buffer[MAX_MSG_LENGTH];
+    static uint8_t buffer[MAX_MSG_LENGTH];
     static unsigned int buffer_ind = 0;
+    static unsigned long last_packet_time = millis();
 
     if(connected) {
         while(Serial.available() > 0) {
             // If data present on serial, grab a single byte of it
-            byte byte_in = Serial.read();
+            uint8_t byte_in = Serial.parseInt();
+
+            // Debugging output
+            Serial.println("Byte: " + String(byte_in));
 
             // Add it to the filtered byte buffer (exc. EOL and OoR)
             // with \n representing the end of an RGB triple
-            if(byte_in != '\n' && buffer_ind < MAX_MSG_LENGTH)
-                buffer[buffer_ind++] = byte_in;
-            else
+            if(buffer_ind < MAX_MSG_LENGTH)
+            {
+                buffer[buffer_ind] = byte_in;
+                buffer_ind = buffer_ind + 1;
+            }
+            else {
                 // Clear buffer and set color for the current led
                 buffer_ind = 0;
-                leds[led_ind++] = CRGB(buffer[0], buffer[1], buffer[2]);
+                leds[led_ind] = CRGB(buffer[0], buffer[1], buffer[2]);
+                // Debugging output
+                Serial.println("LED " + String(led_ind) + ": " + buffer[0] + ", " + buffer[1] + ", " + buffer[2]);
+                led_ind = led_ind + 1;
 
                 // If we have received all our led data then update
                 // strip and set index to beginning of next frame
@@ -76,10 +87,8 @@ void loop() {
                     FastLED.show();
                     led_ind = 0;
                 }
+            }
         }
-
-        // If the data steam halts, then connection was terminated
-        connected = false;
     }
     else establish_handshake();
 }
